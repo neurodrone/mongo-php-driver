@@ -39,3 +39,5 @@ traces.0
 tests/anotherfile
 tests/MongoRunner.php
 tests/unit
+*.swp
+*.patch
