@@ -49,6 +49,7 @@ PHP_METHOD(Mongo, listDBs);
 PHP_METHOD(Mongo, getHosts);
 PHP_METHOD(Mongo, getSlave);
 PHP_METHOD(Mongo, switchSlave);
+PHP_METHOD(Mongo, setPreferredNodes);
 
 #endif
 

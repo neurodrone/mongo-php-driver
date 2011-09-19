@@ -353,6 +353,77 @@ int mongo_util_rs__another_master(zval *response, mongo_link *link TSRMLS_DC) {
   return SUCCESS;
 }
 
+int mongo_util_rs_set_node_preferred(mongo_link *link, char **prefNodes, int prefNodesCount, char **errmsg TSRMLS_DC) {
+	mongo_server *possible_node;
+	int min_ping = INT_MAX;
+
+	if (!link->rs || !link->server_set) {
+		*(errmsg) = estrdup("Connection is not initialized or not a replica set");
+		return FAILURE;
+	}
+
+	possible_node = link->server_set->server;
+
+	link->slave = 0;
+	mongo_server **current_node = malloc(prefNodesCount * sizeof(*current_node));
+	int count = 0, i = 0, ping;
+
+	//First iteration to check if any of the preferred servers are readable
+	while (possible_node) {	
+		if (mongo_util_server_get_readable(possible_node TSRMLS_CC)) {
+			for (i = 0; i < prefNodesCount; ++i) {
+				if (!strcmp(prefNodes[i], possible_node->label)) {
+					current_node[count++] = possible_node;  //Add the readable ones to a new set
+				}
+			}
+		}
+		possible_node = possible_node->next;
+	}
+
+	//If readable preferred servers found, randomly pick one
+	if (count > 0) {
+		srand(time(NULL));
+		int rnd = rand() % count;
+		if (current_node[rnd] != link->server_set->master) {
+			link->slave = current_node[rnd];
+		}
+	} else {
+
+		//otherwise pick any from the set of live ones
+		possible_node = link->server_set->server;
+
+		while (possible_node) {
+
+			if (!mongo_util_server_get_readable(possible_node TSRMLS_CC)) {
+			  possible_node = possible_node->next;
+			  continue;
+			}
+
+			ping = mongo_util_server_get_ping_time(possible_node TSRMLS_CC);
+			if (ping < min_ping && possible_node != link->server_set->master) {
+				link->slave = possible_node;
+				min_ping = ping;
+			}
+
+			possible_node = possible_node->next;
+		}
+	}
+
+	if (link->slave) {
+		return RS_SECONDARY;
+	}
+
+	// if we've run out of possibilities, use the master
+	else if (!link->slave &&
+		link->server_set->master && link->server_set->master->connected) {
+		link->slave = link->server_set->master;
+		return RS_PRIMARY;
+	}
+
+	*errmsg = estrdup("No secondary found");
+	return FAILURE;
+}
+
 int mongo_util_rs__set_slave(mongo_link *link, char **errmsg TSRMLS_DC) {
   mongo_server *possible_slave;
   int min_ping = INT_MAX;
@@ -365,6 +436,7 @@ int mongo_util_rs__set_slave(mongo_link *link, char **errmsg TSRMLS_DC) {
   possible_slave = link->server_set->server;
 
   link->slave = 0;
+
   while (possible_slave) {
     int ping;
 
@@ -394,4 +466,4 @@ int mongo_util_rs__set_slave(mongo_link *link, char **errmsg TSRMLS_DC) {
 
   *errmsg = estrdup("No secondary found");
   return FAILURE;
-}
+} 
