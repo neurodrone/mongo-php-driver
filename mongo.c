@@ -674,8 +674,8 @@ PHP_METHOD(Mongo, setPreferredNodes) {
 
 	//Tokenize the list of servers delimited by commas
 	int nodesCount = 0;
-	preferredNodes[nodesCount++] = strtok(tokens, ",");
-	while ((preferredNodes[nodesCount] = strtok(NULL, ","))) {
+	preferredNodes[nodesCount++] = strtok(tokens, ", ");
+	while ((preferredNodes[nodesCount] = strtok(NULL, ", "))) {
 		nodesCount++;
 	}
 
