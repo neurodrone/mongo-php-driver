@@ -47,6 +47,14 @@ mongo_server* mongo_util_rs_get_master(mongo_link *link TSRMLS_DC);
  */
 int mongo_util_rs__set_slave(mongo_link *link, char **errmsg TSRMLS_DC);
 
+/** Sailthru special
+ * This takes in an input of list of machines that are to be preferred
+ * over the complete remaining set to perform the reads on, if they are
+ * alive. If not, then querying reads from the non-preferred nodes, or 
+ * the Master itself.
+ */
+int mongo_util_rs_set_slave_preferred(mongo_link *link, char **prefSlaves, int prefSlavesCount, char **errmsg TSRMLS_DC);
+
 /**
  * Ping the servers in the set.  Refresh the servers if it's been a while or
  * force_refresh is set.

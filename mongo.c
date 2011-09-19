@@ -93,6 +93,7 @@ static zend_function_entry mongo_methods[] = {
   PHP_ME(Mongo, getHosts, NULL, ZEND_ACC_PUBLIC)
   PHP_ME(Mongo, getSlave, NULL, ZEND_ACC_PUBLIC)
   PHP_ME(Mongo, switchSlave, NULL, ZEND_ACC_PUBLIC)
+  PHP_ME(Mongo, setPreferredNodes, NULL, ZEND_ACC_PUBLIC)
   PHP_ME(Mongo, close, NULL, ZEND_ACC_PUBLIC)
   PHP_ME(Mongo, setPoolSize, NULL, ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
   PHP_ME(Mongo, getPoolSize, NULL, ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
@@ -658,6 +659,50 @@ PHP_METHOD(Mongo, switchSlave) {
   }
 
   MONGO_METHOD(Mongo, getSlave, return_value, getThis());
+}
+
+PHP_METHOD(Mongo, setPreferredNodes) {
+	mongo_link *link;
+	char **errmsg = 0;
+	char *tokens = NULL;
+	char *preferredSlaves[10];
+	int token_count;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &tokens, &token_count) == FAILURE) {
+		return;
+	}
+
+	//Tokenize the list of servers delimited by commas
+	int slavesCount = 0;
+	preferredSlaves[slavesCount++] = strtok(tokens, ",");
+	while ((preferredSlaves[slavesCount] = strtok(NULL, ","))) {
+		slavesCount++;
+	}
+
+	PHP_MONGO_GET_LINK(getThis());
+
+	if (!link->rs) {
+		zend_throw_exception(mongo_ce_Exception,
+							"Reading from slaves won't work without using the replicaSet option on connect",
+							15 TSRMLS_CC);
+		return;
+	}
+
+	mongo_util_rs_ping(link TSRMLS_CC);
+	if (mongo_util_rs_set_slave_preferred(link, preferredSlaves, slavesCount, &errmsg TSRMLS_CC) == FAILURE) {
+		if (!EG(exception)) {
+			if (errmsg) {
+				zend_throw_exception(mongo_ce_Exception, errmsg, 16 TSRMLS_CC);
+				efree(errmsg);
+			}
+			else {
+				zend_throw_exception(mongo_ce_Exception, "No server found for reads", 16 TSRMLS_CC);
+			}
+		}
+		return;
+	}
+
+	MONGO_METHOD(Mongo, getSlave, return_value, getThis());
 }
 
 static void run_err(int err_type, zval *return_value, zval *this_ptr TSRMLS_DC) {
